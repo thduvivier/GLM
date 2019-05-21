@@ -374,7 +374,7 @@ K2 <- t(D2)%*%D2
 
 B <- spline.des(knots=knots,x,ord=4)$design
 Bfit <- spline.des(knots=knots,xseq,ord=4)$design
-
+fds
 
 betahat <- solve(t(B)%*%B + optlambda*K1)%*%t(B)%*%y
 fitted <- Bfit%*%betahat
