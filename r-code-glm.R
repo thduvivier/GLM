@@ -253,7 +253,7 @@ y <- df$profit
 nrknots <- 5
 
 # Optimal lambda determined in program crossvalidation_simulated.r
-okok
+ok
 optlambda <- 0.01
 
 minx <- min(x)-0.001
