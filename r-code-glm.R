@@ -3,9 +3,10 @@ library(ggplot2)
 library(reshape2)µ
 library(MASS)
 library(splines)
+library(mgcv)
 
 
-setwd("C:/Users/duviv/Documents/University/KUL/S2/Abandoned/Generalized Linear Models/Group work")
+setwd("C:/Users/duviv/Documents/University/KUL/S2/Abandoned/Generalized-Linear-Models/Group-work")
 df <- read_xlsx("IMDb.xlsx")
 df <- df[,c("profit", "budget", "director_facebook_likes", "content_rating")]
 df$content_rating <- as.factor(df$content_rating)
@@ -253,7 +254,6 @@ y <- df$profit
 nrknots <- 5
 
 # Optimal lambda determined in program crossvalidation_simulated.r
-ok
 optlambda <- 0.01
 
 minx <- min(x)-0.001
@@ -392,7 +392,44 @@ lines(xseq,fitted,lwd=2,col="steelblue")
 
 # 3. Include the other covariates in the model and determine what variables show an ----
 # impact on the profit.
+lm.fit <- lm(profit ~ budget + director_facebook_likes, data =df)
+summary(lm.fit)
+AIC(lm.fit)
+
+plot(df$budget, df$profit)
+plot(df$director_facebook_likes, df$profit)
+ggplot(df, aes(content_rating, profit)) + 
+  geom_point() + 
+
+
+abline(lm(profit~director_facebook_likes, data=df))
+df.no.out <- df[-13,]
+abline(lm(profit~director_facebook_likes, data=df.no.out), col="red")
+plot(df$content_rating, df$profit)
+
+df$director_facebook_likes2 <- df$director_facebook_likes^2
+plot(df$director_facebook_likes2, df$profit)
+
+df.gam <- gam(profit~s(df$budget, bs="ps", k=20)+s(df$director_facebook_likes,bs="ps", k=20)+
+                    df$content_rating, data=df)
+
+plot(df.gam, residuals=FALSE, cex=1.3, col="red", shade=TRUE)
+gam.check(munich.gam,col="blue")
+plot(munich.gam,residuals=TRUE,cex=1.3,col="red",shade=TRUE)
+gam.check(munich.gam,col="blue")
 
 # 4. A movie is defined successful when the profit is positive. Fit a model that relates ----
 # the probability of success and the covariates considered above.
+
+df$profit.bin <- ifelse(df$profit>0, 1, 0)
+fit.logit <- glm(profit.bin ~ budget + 
+                 director_facebook_likes + content_rating, 
+                 family=binomial("logit"), data=df)
+summary(fit.logit)
+
+# Apply GAM
+fit.logit.gam <- gam(profit.bin ~ s(df$budget, bs="ps", k=20) + 
+                     director_facebook_likes + content_rating, 
+                     family=binomial("logit"), data=df)
+summary(fit.logit.gam)
 
