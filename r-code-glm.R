@@ -483,6 +483,30 @@ logitgam3 <- gam(I(profit > 0) ~
                  content_rating, 
                  data=df, family = binomial)
 
+logitgam4 <- gam(I(profit > 0) ~ 
+                 s(budget, bs="ps", k=30),
+                 data=df, family = binomial)
+
+logitgam5 <- gam(I(profit > 0) ~ 
+                 budget,
+                 data=df, family = binomial)
+
+logitgam6 <- gam(I(profit > 0) ~ 
+                 s(duration, bs="ps", k=30),
+                 data=df, family = binomial)
+
+logitgam7 <- gam(I(profit > 0) ~ 
+                 duration,
+                 data=df, family = binomial)
+
+logitgam8 <- gam(I(profit > 0) ~ 
+                 s(budget, bs="ps", k=30) +
+                 duration,
+                 data=df, family = binomial)
+
+AIC(log.fit.1, logitgam1, logitgam2, logitgam3, logitgam4, logitgam5, logitgam6, 
+        logitgam7, logitgam8)
+
 # Plot
 plot(df$budget,df$profit.bin,pch="|",
      cex.lab=1.5,cex.axis=1.3)
