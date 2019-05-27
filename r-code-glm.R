@@ -491,9 +491,263 @@ plot(x, y,xlab=" ",ylab=" ",main="20 knots, optimal lambda = 0.01",
 lines(xseq,fitted,lwd=2,col="steelblue")
 
 
-# 3. Model profit ith covariates ----
+# 3. Model profit with covariates ----
 # Determine which variables show an impact on the profit.
 
+x <- df$budget
+pdf("./figures/T2_loess_budget_profit.pdf", width=7, height=4, pointsize=12)
+plot(x, df$profit,
+     xlab="Budget",ylab="Profit",
+     cex.lab=1.5,cex.axis=1.3,cex=1.3, col="black")
+orderx <- order(x)
+lines(x[orderx],predict(loess(df$profit ~ x))[orderx],
+      lwd=2,col="red")
+dev.off()
+
+x <- df$director_facebook_likes
+pdf("./figures/T2_loess_fblikes_profit.pdf", width=7, height=4, pointsize=12)
+plot(x, df$profit,
+     xlab="Director facebook likes",ylab="Profit",
+     cex.lab=1.5,cex.axis=1.3,cex=1.3, col="black")
+orderx <- order(x)
+lines(x[orderx],predict(loess(df$profit ~ x))[orderx],
+      lwd=2,col="red")
+dev.off()
+
+x <- df$content_rating
+pdf("./figures/T2_loess_content_profit.pdf", width=7, height=4, pointsize=12)
+plot(x, df$profit,
+     xlab="Content rating",ylab="Profit",
+     cex.lab=1.5,cex.axis=1.3,cex=1.3)
+dev.off()
+
+x <- df$duration
+pdf("./figures/T2_loess_duration_profit.pdf", width=7, height=4, pointsize=12)
+plot(x, df$profit,
+     xlab="Duration",ylab="Profit",
+     cex.lab=1.5,cex.axis=1.3,cex=1.3, col="black")
+orderx <- order(x)
+lines(x[orderx],predict(loess(df$profit ~ x))[orderx],
+      lwd=2,col="red")
+dev.off()
+
+# Null model
+profit.gam.null <- gam(profit ~ 1, data=df)
+
+# Naive model
+profit.gam <- gam(profit ~ s(budget,bs="ps", k=10) + s(director_facebook_likes, bs="ps", k=10) +
+                    s(duration,bs="ps", k=10) + content_rating, data=df)
+summary(profit.gam)
+gam.check(profit.gam)
+
+#par(mfrow = c(1,1))
+#plot(profit.gam,residuals=FALSE,col="red",shade=TRUE, cex = 2)
+
+pdf("./figures/T2_gam_resid_budget.pdf", width=7, height=4, pointsize=12)
+par(mfrow = c(1,1))
+plot(profit.gam,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 1)
+dev.off()
+
+pdf("./figures/T2_gam_resid_fblikes.pdf", width=7, height=4, pointsize=12)
+par(mfrow = c(1,1))
+plot(profit.gam,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 2)
+dev.off()
+
+pdf("./figures/T2_gam_resid_duration.pdf", width=7, height=4, pointsize=12)
+par(mfrow = c(1,1))
+plot(profit.gam,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 3)
+dev.off()
+
+
+#profit.gamA <- gam(profit ~ s(budget,bs="ps"), data=df)
+#profit.gamB <- gam(profit ~ s(director_facebook_likes,bs="ps") + content_rating, data=df)
+#profit.gamC <- gam(profit ~ s(duration,bs="ps"), data=df)
+#profit.gamD <- gam(profit ~ content_rating, data=df)
+#AIC(profit.gamA, profit.gamB, profit.gamC, profit.gamD, profit.gam.full)
+
+# Step AIC procedure
+profit.gam.full <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                         s(director_facebook_likes, bs="ps", k=10) +
+                         s(duration,bs="ps", k=10) + 
+                         content_rating, data=df)
+
+profit.gam.fullA <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10)+
+                          s(duration,bs="ps", k=10) + 
+                          content_rating, data=df)
+profit.gam.fullB <- gam(profit ~ s(budget,bs="ps", k=10) +
+                          s(duration,bs="ps", k=10) + 
+                          content_rating, data=df)
+profit.gam.fullC <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                          s(director_facebook_likes, bs="ps", k=10) +
+                          content_rating, data=df)
+profit.gam.fullD <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                          s(director_facebook_likes, bs="ps", k=10) +
+                          s(duration,bs="ps", k=10), data=df)
+
+AIC(profit.gam.full, profit.gam.fullA, profit.gam.fullB, 
+    profit.gam.fullC, profit.gam.fullD) 
+# We prefer model D
+
+profit.gam.fullDA <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10) +
+                           s(duration,bs="ps", k=10), data=df)
+profit.gam.fullDB <- gam(profit ~ s(budget,bs="ps", k=10) +
+                           s(duration,bs="ps", k=10), data=df)
+profit.gam.fullDC <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                           s(director_facebook_likes, bs="ps", k=10), 
+                         data=df)
+
+AIC(profit.gam.full, profit.gam.fullD, profit.gam.fullDA, profit.gam.fullDB, profit.gam.fullDC) 
+# We prefere model DC
+
+profit.gam.fullDCA <- gam(profit ~ s(duration,bs="ps", k=10), data=df)
+profit.gam.fullDCB <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10), data=df)
+AIC(profit.gam.full, profit.gam.fullD, profit.gam.fullDC, profit.gam.fullDCA, profit.gam.fullDCB) 
+# We prefere model DC
+
+summary(profit.gam.fullDC)
+gam.check(profit.gam.fullDC)
+pdf("./figures/T2_finalGAM_resid_budget.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(profit.gam.fullDC,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 1)
+dev.off()
+
+pdf("./figures/T2_finalGAM_resid_fblikes.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(profit.gam.fullDC,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 2)
+dev.off()
+
+hat.gam.full = influence.gam(profit.gam.full)
+summary(hat.gam.full)
+plot(hat.gam.full, type='l')
+which(hat.gam.full == max(hat.gam.full))
+# Outlier seems to be observation 169
+
+hat.gam.fullDC = influence.gam(profit.gam.fullDC)
+summary(hat.gam.fullDC)
+which(hat.gam.fullDC == max(hat.gam.fullDC))
+
+pdf("./figures/T2_finalGAM_hatmatrix.pdf", width=7, height=4, pointsize=12)
+par(mfrow = c(1,1))
+plot(hat.gam.fullDC, type='l')
+dev.off()
+# Same outlier as in the full model
+
+# Remove the outlier:
+df_outlier = df[-169, ]
+
+profit.gam.full.outlier <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                                 s(director_facebook_likes, bs="ps", k=10) +
+                                 s(duration,bs="ps", k=10) + 
+                                 content_rating, data=df_outlier)
+summary(profit.gam.full)
+plot(profit.gam.full.outlier,residuals=TRUE,col="red",shade=TRUE, cex = 2)
+
+profit.gam.fullA.outlier <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10) +
+                                s(duration,bs="ps", k=10) + 
+                                content_rating, data=df_outlier)
+profit.gam.fullB.outlier <- gam(profit ~ s(budget,bs="ps", k=10) +
+                                s(duration,bs="ps", k=10) + 
+                                content_rating, data=df_outlier)
+profit.gam.fullC.outlier <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                                  s(director_facebook_likes, bs="ps", k=10) + 
+                                  content_rating, data=df_outlier)
+profit.gam.fullD.outlier <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                                  s(director_facebook_likes, bs="ps", k=10) +
+                                  s(duration,bs="ps", k=10), data=df_outlier)
+
+AIC(profit.gam.full.outlier, profit.gam.fullA.outlier, 
+    profit.gam.fullB.outlier, profit.gam.fullC.outlier, 
+    profit.gam.fullD.outlier) 
+# We prefer model D
+
+profit.gam.fullDA.outlier <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10) +
+                                 s(duration,bs="ps", k=10), data=df)
+profit.gam.fullDB.outlier <- gam(profit ~ s(budget,bs="ps", k=10) +
+                                 s(duration,bs="ps", k=10), data=df)
+profit.gam.fullDC.outlier <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                                 s(director_facebook_likes, bs="ps", k=10), 
+                                 data=df)
+
+AIC(profit.gam.full.outlier, profit.gam.fullD.outlier, 
+    profit.gam.fullDA.outlier, profit.gam.fullDB.outlier, 
+    profit.gam.fullDC.outlier)
+# We prefer model D
+
+summary(profit.gam.fullD.outlier)
+gam.check(profit.gam.fullD.outlier)
+
+pdf("./figures/T2_finalGAM_outlier_resid_budget.pdf", width=7, height=4, pointsize=12)
+par(mfrow= c(1,1))
+plot(profit.gam.fullD.outlier,residuals=TRUE,col="red",
+     shade=TRUE, cex = 2, select = 1)
+dev.off()
+
+pdf("./figures/T2_finalGAM_outlier_resid_fblikes.pdf", width=7, height=4, pointsize=12)
+par(mfrow= c(1,1))
+plot(profit.gam.fullD.outlier,residuals=TRUE,col="red",
+     shade=TRUE, cex = 2, select = 2)
+dev.off()
+
+pdf("./figures/T2_finalGAM_outlier_resid_duration.pdf", width=7, height=4, pointsize=12)
+par(mfrow= c(1,1))
+plot(profit.gam.fullD.outlier,residuals=TRUE,col="red",
+     shade=TRUE, cex = 2, select = 3)
+dev.off()
+
+hat.gam.fullD.outlier = influence.gam(profit.gam.fullD.outlier)
+summary(hat.gam.fullD.outlier)
+which(hat.gam.fullD.outlier == max(hat.gam.fullD.outlier))
+
+
+pdf("./figures/T2_finalGAM_outlier_hatmatrix.pdf", width=7, height=4, pointsize=12)
+par(mfrow = c(1,1))
+plot(hat.gam.fullD.outlier, type='l')
+dev.off()
+
+
+
+# TODO: outlier and linear talk
+
+profit.gam.full <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                         s(director_facebook_likes, bs="ps", k=10) +
+                         s(duration,bs="ps", k=10) + content_rating, data=df)
+profit.gam.full.linearA <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                          s(director_facebook_likes, bs="ps", k=10) +
+                          duration + content_rating, data=df)
+profit.gam.full.linearB <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                          director_facebook_likes +
+                          s(duration,bs="ps", k=10) + content_rating, data=df)
+profit.gam.full.linearC <- gam(profit ~ budget + 
+                          s(director_facebook_likes, bs="ps", k=10) +
+                          s(duration,bs="ps", k=10) + content_rating, data=df)
+profit.gam.full.linear <- gam(profit ~ budget + director_facebook_likes +
+                          duration + content_rating, data=df)
+
+AIC(profit.gam.full, profit.gam.full.linearA, profit.gam.full.linearB, 
+    profit.gam.full.linearC, profit.gam.full.linear) 
+
+# No evidence that making terms linear improve the AIC.
+
+
+profit.gam.fullDC <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                         s(director_facebook_likes, bs="ps", k=10), data=df)
+profit.gam.full.linearA <- gam(profit ~ budget + 
+                                 s(director_facebook_likes, bs="ps", k=10), 
+                               data=df)
+profit.gam.full.linearB <- gam(profit ~ s(budget,bs="ps", k=10) + 
+                                 director_facebook_likes, data=df)
+profit.gam.full.linear <- gam(profit ~ budget + 
+                                director_facebook_likes, data=df)
+profit.lm.fit <- lm(profit ~ budget + director_facebook_likes, data =df)
+
+AIC(profit.gam.fullDC, profit.gam.full.linearA, profit.gam.full.linearB, 
+    profit.gam.full.linear, profit.lm.fit) 
+
+# No evidence that making terms linear improve the AIC.
+
+
+
+#####################
 
 
 
@@ -520,11 +774,12 @@ df.gam <- gam(profit~s(df$budget, bs="ps", k=20)+s(df$director_facebook_likes,bs
 
 plot(df.gam, residuals=FALSE, cex=1.3, col="red", shade=TRUE)
 gam.check(munich.gam,col="blue")
-plot(munich.gam,residuals=TRUE,cex=1.3,col="red",shade=TRUE)
-gam.check(munich.gam,col="blue")
 
-# 4. A movie is defined successful when the profit is positive. Fit a model that relates ----
-# the probability of success and the covariates considered above.
+
+# 4. Model profit as a binomial ----
+# A movie is defined successful when the profit is positive. 
+# Fit a model that relates the probability of success and 
+#   the covariates considered above.
 
 ggplot(df, aes(budget, profit) ) +
   geom_point() +
