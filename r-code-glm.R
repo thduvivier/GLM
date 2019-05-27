@@ -1,49 +1,51 @@
-library(readxl) 
+# Authors: Bruno Esposito and Thomas Duvivier
+rm(list = ls())
+
+library(openxlsx)
+library(corrplot)
+library(stargazer)
 library(ggplot2)
-library(reshape2)µ
+library(reshape2)
 library(MASS)
 library(splines)
 library(mgcv)
 
+source("./glm_functions.r")
 
-setwd("C:/Users/duviv/Documents/University/KUL/S2/Abandoned/Generalized-Linear-Models/Group-work")
-df <- read_xlsx("IMDb.xlsx")
-df <- df[,c("profit", "budget", "director_facebook_likes", "content_rating", "duration")]
+thomas.path <- paste0("C:/Users/duviv/Documents/University/KUL/S2/",
+                      "Abandoned/Generalized-Linear-Models/Group-work")
+bruno.path <- paste0("/Users/bruno_esposito/Dropbox/KUL/Courses/",
+                      "2nd Semester/Generalized Linear Models/",
+                      "Assignment2/GLM")
+
+setwd(bruno.path)
+raw_df <- read.xlsx("./data/IMDb.xlsx")
+df <- raw_df[,c("profit", "budget", "director_facebook_likes", "content_rating", "duration")]
 df$content_rating <- as.factor(df$content_rating)
 df$profit.bin <- ifelse(df$profit>0, 1, 0)
 
 
 # 1. Descriptive ----
 
-df <- df[,-4]
+# Remove content rating because it is a factor variable
+df_descriptive <- df[, !(colnames(df) %in% c('content_rating'))]
 # 1.a Correlation Heatmap
-cormat <- round(cor(df, method = "pearson", use = "complete.obs"), 2)
+cormat <- round(cor(df_descriptive, method = "pearson", 
+                    use = "complete.obs"), 2)
 cormat
 # cormat <- round(cor(df, method = "pearson", use = "complete.obs"), 2)
 cormat
 melted_cor <- melt(cormat)
 
-library(ggplot2)
 ggplot(data = melted_cor, aes(x=Var1, y=Var2, fill=value)) + 
   geom_tile()
-
-get_lower_tri<-function(cormat){
-  cormat[upper.tri(cormat)] <- NA
-  return(cormat)
-}
-# Get upper triangle of the correlation matrix
-get_upper_tri <- function(cormat){
-  cormat[lower.tri(cormat)]<- NA
-  return(cormat)
-}
 
 upper_tri <- get_upper_tri(cormat)
 upper_tri
 
-library(reshape2)
 melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
 # Heatmap
-library(ggplot2)
 ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
   geom_tile(color = "white")+
   scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
@@ -59,7 +61,7 @@ fit1 <- lm(profit ~ budget, data = df)
 fit2 <- lm(profit ~ budget + I(budget^2), data = df)
 fit3 <- lm(profit ~ budget + I(budget^2) + I(budget^3), data = df)
 
-pdf("./profit-budgete2.pdf", width=7, height=4, pointsize=10)
+pdf("./figures/profit-budgete2.pdf", width=7, height=4, pointsize=10)
 plot(df$budget, df$profit, xlab = "budget", ylab="profit")
 lines(df$budget, predict(fit1), col="red")
 lines(df$budget, predict(fit2), col="green")
@@ -76,7 +78,7 @@ for (i in 2:10) {
 }
 
 
-pdf("./profit-budgete-poly.pdf", width=7, height=4, pointsize=10)
+pdf("./figures/profit-budgete-poly.pdf", width=7, height=4, pointsize=10)
 plot(df$budget, df$profit, xlab = "budget", ylab="profit")
 lines(sort(df$budget), fitted(model_poly[[1]])[order(df$budget)], col='red') 
 lines(sort(df$budget), fitted(model_poly[[3]])[order(df$budget)], col='green') 
@@ -84,41 +86,76 @@ lines(sort(df$budget), fitted(model_poly[[10]])[order(df$budget)], col='blue')
 legend(230, 350, c("Degree 1", "Degree 3", "Degree 10"), lty = 1, col = c("red", "green", "blue"))
 dev.off()
 
+stargazer(df)
+summary(df)
+pairs(df, panel = function(x,y) {points(x,y); lines(lowess(x,y), col = "red")})
+corrplot(cor(df[, !(colnames(df) %in% c('content_rating'))]))
 
+model1 = lm(profit ~ budget + director_facebook_likes + content_rating, data=df)
+summary(model1)
+
+par(mfrow = c(2,2))
+plot(model1)
+anova(model1)
+
+df_ord = df[order(df$budget), ]
+model_loess <- loess(profit ~ budget, span = 2/3, degree = 2, data=df_ord)
+par(mfrow = c(1,1))
+plot(df_ord$budget, df_ord$profit,ylab='Profit', xlab='Fitted values')
+lines(df_ord$budget, predict(model_loess), col='red')
+
+# TODO: 4 plot of profit vs covariates
 
 # 2. Model the profit as a function of budget only, use the following techniques:----
 # Covariates used in this analysis are content_rating, budget, director_facebook_likes.
 
-lm_formula <- function(variables.vec,
-                       dependent = '',
-                       interactions = F, 
-                       quadratics = F,
-                       non.num.vars = NA) {
-  if (interactions) {
-    collapse.symbol <- '*'
-  } else {
-    collapse.symbol <- '+'
-  }
-  if (quadratics) {
-    quadratic.formula <- paste0('+' , paste0('I(',
-                                             setdiff(variables.vec,
-                                                     non.num.vars),
-                                             '^2)',
-                                             collapse = '+'))
-  } else {
-    quadratic.formula <- ''
-  }
-  
-  as.formula(paste0(dependent, '~ ',
-                    paste0(paste0(variables.vec, collapse = collapse.symbol),
-                           quadratic.formula)))
-}
+# Check nonlinearity (NOT NECESSARY)
+df_nonlin <- df
+df_nonlin$budget.class1 <- as.numeric(I(df$budget <= 50))
+df_nonlin$budget.class2 <- as.numeric(I(df$budget > 50 & df$budget <= 100))
+df_nonlin$budget.class3 <- as.numeric(I(df$budget > 100 & df$budget <= 150))
+df_nonlin$budget.class4 <- as.numeric(I(df$budget > 150 & df$budget <= 200))
+df_nonlin$budget.class5 <- as.numeric(I(df$budget <= 250))
+
+model_discrete = lm(profit ~ budget.class1 + budget.class2 + budget.class3 + 
+                      budget.class4 + budget.class5, data = df_nonlin)
+summary(model_discrete)
+plot(sort(df_nonlin$budget), predict(model_discrete)[order(df_nonlin$budget)], 
+     type='l', ylab='Predicted profit', xlab='Budget')
+#lines(sort(df$budget), predict(model_discrete)[order(df$budget)])
+
 
 #  2.a Polynomial regression model----
 fit1 <- lm(profit ~ budget + I(budget^2), data = df)
 summary(fit1)
 plot(df$profit ~ df$budget)
 boxplot(df$profit)
+
+model_poly = list()
+model_poly[[1]] = lm(profit ~ budget, df)
+temp_formula = 'profit ~ budget'
+for (i in 2:10) {
+  temp_formula = paste(temp_formula, ' + I(budget^', i, ')', sep='')
+  model_poly[[i]] = lm(formula(temp_formula), df)
+}
+
+out_bic = unlist(lapply(model_poly, BIC))
+out_aic = unlist(lapply(model_poly, AIC))
+
+out_bic
+out_aic
+
+# Order 1 is the best model 
+par(mfrow=c(1,1))
+plot(df$budget, df$profit, ylab='Profit', xlab='Budget')
+abline(model_poly[[1]], col='red')
+#TODO talk about AIC in this context. 
+#TODO Add confidence intervals for the best model.
+#TODO make a plot of the AIC
+
+
+
+
 
 #  2.b Truncated polynomial splines of degree 2 (consider k=2, 3 and 5 knots)----
 range(df$budget)
