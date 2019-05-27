@@ -447,10 +447,14 @@ add1(logit.fit,~ . + director_facebook_likes + content_rating + duration, test="
 
 # Then we start with fully specified model 
 # Add or delete variables one by one
-log.fit.2 <- glm(I(profit>0) ~ budget + duration + director_facebook_likes + content_rating, 
+log.fit.1 <- glm(I(profit>0) ~ budget + 
+                 duration +
+                 director_facebook_likes + 
+                 content_rating, 
                  family = binomial,
                  data = df)
 summary(log.fit.2)
+
 
 # option Chisq is the same here as LRT
 anova(log.fit.2,test="Chisq")
@@ -464,34 +468,20 @@ logitgam1 <- gam(I(profit > 0) ~
                  director_facebook_likes + 
                  content_rating, 
                  data=df, family = binomial)
+
 logitgam2 <- gam(I(profit > 0) ~ 
                  budget + 
-                 duration +
+                 s(duration, bs="ps", k=30) +
                  director_facebook_likes + 
                  content_rating, 
                  data=df, family = binomial)
 
-
-# Do we need non linearity for duration ?
-anova(logitgam1,logitgam2,test = "Chisq") # Non significant difference between the two so linear is ok
-
-logitgam1 <- gam(I(profit > 0) ~ 
-                   budget + 
-                   s(duration, bs="ps", k=30) +
-                   director_facebook_likes + 
-                   content_rating, 
+logitgam3 <- gam(I(profit > 0) ~ 
+                 s(budget, bs="ps", k=30) + 
+                 s(duration, bs="ps", k=30) +
+                 director_facebook_likes + 
+                 content_rating, 
                  data=df, family = binomial)
-logitgam2 <- gam(I(profit > 0) ~ 
-                   budget + 
-                   duration +
-                   director_facebook_likes + 
-                   content_rating, 
-                 data=df, family = binomial)
-
-
-# Do we need non linearity for budget ?
-anova(logitgam1,logitgam2,test = "Chisq")
-
 
 # Plot
 plot(df$budget,df$profit.bin,pch="|",
