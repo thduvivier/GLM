@@ -8,8 +8,10 @@ library(mgcv)
 
 setwd("C:/Users/duviv/Documents/University/KUL/S2/Abandoned/Generalized-Linear-Models/Group-work")
 df <- read_xlsx("IMDb.xlsx")
-df <- df[,c("profit", "budget", "director_facebook_likes", "content_rating")]
+df <- df[,c("profit", "budget", "director_facebook_likes", "content_rating", "duration")]
 df$content_rating <- as.factor(df$content_rating)
+df$profit.bin <- ifelse(df$profit>0, 1, 0)
+
 
 # 1. Descriptive ----
 
@@ -399,7 +401,7 @@ AIC(lm.fit)
 plot(df$budget, df$profit)
 plot(df$director_facebook_likes, df$profit)
 ggplot(df, aes(content_rating, profit)) + 
-  geom_point() + 
+  geom_point()
 
 
 abline(lm(profit~director_facebook_likes, data=df))
@@ -421,15 +423,78 @@ gam.check(munich.gam,col="blue")
 # 4. A movie is defined successful when the profit is positive. Fit a model that relates ----
 # the probability of success and the covariates considered above.
 
+ggplot(df, aes(budget, profit) ) +
+  geom_point() +
+  stat_smooth()
+ggplot(df, aes(duration, profit) ) +
+  geom_point() +
+  stat_smooth()
+ggplot(df, aes(director_facebook_likes, profit) ) +
+  geom_point() +
+  stat_smooth()
+ggplot(df, aes(content_rating, y=profit) ) +
+  geom_point() +
+  stat_summary(fun.y=mean, geom="point", shape=20, size=4, color="red", fill="red")
+# /!\ All of them are flat /!\
+
+
 # The model
-df$profit.bin <- ifelse(df$profit>0, 1, 0)
-fit.logit <- glm(profit.bin ~ budget + 
-                 director_facebook_likes + content_rating, 
-                 family=binomial("logit"), data=df)
-summary(fit.logit)
+# First we start with simple model, then increase by one variable at a time
+# Two different tests are in use: LRT or score test (Rao)
+logit.fit <- glm(I(profit>0) ~ budget, data = df, family = binomial) 
+summary(logit.fit)
+add1(logit.fit,~ . + director_facebook_likes + content_rating + duration, test="LRT")
+
+# Then we start with fully specified model 
+# Add or delete variables one by one
+log.fit.2 <- glm(I(profit>0) ~ budget + duration + director_facebook_likes + content_rating, 
+                 family = binomial,
+                 data = df)
+summary(log.fit.2)
+
+# option Chisq is the same here as LRT
+anova(log.fit.2,test="Chisq")
+anova(carieslogitmodel2,test="LRT")
+drop1(carieslogitmodel2,test="Chisq")
+
+# Apply GAM
+logitgam1 <- gam(I(profit > 0) ~ 
+                 s(budget, bs="ps", k=30) + 
+                 duration +
+                 director_facebook_likes + 
+                 content_rating, 
+                 data=df, family = binomial)
+logitgam2 <- gam(I(profit > 0) ~ 
+                 budget + 
+                 duration +
+                 director_facebook_likes + 
+                 content_rating, 
+                 data=df, family = binomial)
+
+
+# Do we need non linearity for duration ?
+anova(logitgam1,logitgam2,test = "Chisq") # Non significant difference between the two so linear is ok
+
+logitgam1 <- gam(I(profit > 0) ~ 
+                   budget + 
+                   s(duration, bs="ps", k=30) +
+                   director_facebook_likes + 
+                   content_rating, 
+                 data=df, family = binomial)
+logitgam2 <- gam(I(profit > 0) ~ 
+                   budget + 
+                   duration +
+                   director_facebook_likes + 
+                   content_rating, 
+                 data=df, family = binomial)
+
+
+# Do we need non linearity for budget ?
+anova(logitgam1,logitgam2,test = "Chisq")
+
 
 # Plot
-plot(birthweight,bpd,pch="|",xlab="Birthweight (grams)",
+plot(df$budget,df$profit.bin,pch="|",
      cex.lab=1.5,cex.axis=1.3)
 x <- seq(min(birthweight),max(birthweight))
 lines(x,myexpit(x,b0=lrmod1$coeff[1],b1=lrmod1$coeff[2]),
@@ -444,11 +509,4 @@ attributes(summary(fit.logit))
 dev <- summary(fit.logit)$deviance
 df <- summary(fit.logit)$df.residual
 1-pchisq(dev,df)
-
-
-# Apply GAM
-fit.logit.gam <- gam(profit.bin ~ s(df$budget, bs="ps", k=20) + 
-                     director_facebook_likes + content_rating, 
-                     family=binomial("logit"), data=df)
-summary(fit.logit.gam)
 
