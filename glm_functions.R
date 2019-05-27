@@ -77,7 +77,17 @@ get_bsplines <- function(x, y, nrknots){
   
   betahat <- solve(t(B)%*%B)%*%t(B)%*%y
   fitted <- Bfit%*%betahat
-  return(list(xseq, fitted))
+  
+  n <- length(x)
+  S <- B%*%solve(t(B)%*%B)%*%t(B)
+  fit <- as.vector(B%*%betahat)
+  diags <- diag(S)
+  df <- sum(diags)
+  sigma2 <- sum((y-fit)^2)/n
+  my_aic <- n*log(sigma2) + 2*(df+1)
+  r_aic <- n*(log(2*pi)+1+log(sigma2))++ 2*(df+1)
+  
+  return(list(xseq, fitted, my_aic, r_aic))
 }
 
 get_lambda <- function(x, y, nrknots) {
@@ -153,5 +163,15 @@ get_cubic_psplines <- function(x, y, nrknots, lambda) {
   betahat <- solve(t(B)%*%B + lambda*K2)%*%t(B)%*%y
   fitted <- B%*%betahat
   fittedplot <- Bplot%*%betahat
-  return(list(xplot, fittedplot))
+  
+  n <- length(x)
+  S <- B%*%solve(t(B)%*%B + lambda*K2)%*%t(B)
+  fit <- as.vector(B%*%betahat)
+  diags <- diag(S)
+  df <- sum(diags)
+  sigma2 <- sum((y-fit)^2)/n
+  my_aic <- n*log(sigma2) + 2*(df+1)
+  r_aic <- n*(log(2*pi)+1+log(sigma2))++ 2*(df+1)
+  
+  return(list(xplot, fittedplot, my_aic, r_aic))
 }

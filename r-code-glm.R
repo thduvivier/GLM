@@ -110,7 +110,7 @@ out_aic
 pdf("./figures/T2_AIC_polynomial.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
 plot(out_aic, type = 'l',lwd=2,main="",
-     xlab="Polynomial degree",ylab="BIC",
+     xlab="Polynomial degree",ylab="AIC",
      cex.lab=1.5,cex.axis=1.3,col="red",cex=1.3)
 dev.off()
 
@@ -164,6 +164,8 @@ trun_splineA = get_truncated_spline(df$profit, df$budget, n_knots=2, poly_order=
 trun_splineB = get_truncated_spline(df$profit, df$budget, n_knots=3, poly_order=2)
 trun_splineC = get_truncated_spline(df$profit, df$budget, n_knots=5, poly_order=2)
 
+AIC(trun_splineA[[3]], trun_splineB[[3]], trun_splineC[[3]])
+
 pdf("./figures/T2_trunc_spline.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
 plot(df$budget, df$profit)
@@ -182,6 +184,9 @@ dev.off()
 my_splinesA = get_bsplines(df$budget, df$profit, nrknots=3)
 my_splinesB = get_bsplines(df$budget, df$profit, nrknots=5)
 my_splinesC = get_bsplines(df$budget, df$profit, nrknots=8)
+
+my_splinesA[[3]];my_splinesB[[3]];my_splinesC[[3]]
+my_splinesA[[4]];my_splinesB[[4]];my_splinesC[[4]]
 
 pdf("./figures/T2_bspline.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
@@ -334,6 +339,9 @@ lambdamingcv;lambdaminaic;lambdaminbic
 output_psplinesA = get_cubic_psplines(df$budget, df$profit, nrknots = 5, lambdamingcv)
 output_psplinesB = get_cubic_psplines(df$budget, df$profit, nrknots = 8, lambdamingcv)
 output_psplinesC = get_cubic_psplines(df$budget, df$profit, nrknots = 20, lambdamingcv)
+
+output_psplinesA[[3]];output_psplinesB[[3]];output_psplinesC[[3]]
+output_psplinesA[[4]];output_psplinesB[[4]];output_psplinesC[[4]]
 
 pdf("./figures/T2_pspline.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
