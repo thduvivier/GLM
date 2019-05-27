@@ -119,7 +119,6 @@ par(mfrow=c(1,1))
 plot(df$budget, df$profit, ylab='Profit', xlab='Budget')
 abline(model_poly[[1]], col='red')
 
-#TODO Add confidence intervals for the best model.
 
 pdf("./figures/T2_profit-budgete-poly.pdf", width=7, height=4, pointsize=12)
 plot(df$budget, df$profit, xlab = "Budget", ylab="Profit", main='',
@@ -168,7 +167,8 @@ AIC(trun_splineA[[3]], trun_splineB[[3]], trun_splineC[[3]])
 
 pdf("./figures/T2_trunc_spline.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
-plot(df$budget, df$profit)
+plot(df$budget, df$profit, xlab="Profit",ylab="Budget",
+     cex.lab=1.5,cex.axis=1.3,col="black",cex=1.3)
 lines(trun_splineA[[1]], trun_splineA[[2]], lwd=2, col="blue", lty='solid')
 lines(trun_splineB[[1]], trun_splineB[[2]], lwd=2, col="red", lty='longdash')
 lines(trun_splineC[[1]], trun_splineC[[2]], lwd=2, col="darkgreen", lty='dashed')
@@ -176,8 +176,6 @@ legend('topright', c('2 knots', '3 knots', '5 knots'),
        col=c('blue', 'red', 'darkgreen'), 
        lty=c('solid', 'longdash', 'dashed'))
 dev.off()
-#TODO talk about AIC in this context. 
-#TODO Add confidence intervals for the best model.
 
 #  2.c B-splines of degree 2 (consider m=3, 5 and 8 knots)----
 
@@ -199,8 +197,7 @@ legend('topright', c('3 knots', '5 knots', '8 knots'),
        col=c('blue', 'red', 'darkgreen'), 
        lty=c('solid', 'longdash', 'dashed'))
 dev.off()
-#TODO talk about AIC in this context. 
-#TODO Add confidence intervals for the best model.
+
 
 
 # B-splines
