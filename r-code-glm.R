@@ -61,8 +61,9 @@ fit1 <- lm(profit ~ budget, data = df)
 fit2 <- lm(profit ~ budget + I(budget^2), data = df)
 fit3 <- lm(profit ~ budget + I(budget^2) + I(budget^3), data = df)
 
-pdf("./figures/profit-budgete2.pdf", width=7, height=4, pointsize=10)
-plot(df$budget, df$profit, xlab = "budget", ylab="profit")
+# TODO The plot is not showing a line. We have to order the variable. 
+pdf("./figures/T2_profit-budgete2.pdf", width=7, height=4, pointsize=12)
+plot(df$budget, df$profit, xlab = "Budget", ylab="Profit")
 lines(df$budget, predict(fit1), col="red")
 lines(df$budget, predict(fit2), col="green")
 lines(df$budget, predict(fit3), col="blue")
@@ -78,8 +79,8 @@ for (i in 2:10) {
 }
 
 
-pdf("./figures/profit-budgete-poly.pdf", width=7, height=4, pointsize=10)
-plot(df$budget, df$profit, xlab = "budget", ylab="profit")
+pdf("./figures/T2_profit-budgete-poly.pdf", width=7, height=4, pointsize=12)
+plot(df$budget, df$profit, xlab = "Budget", ylab="Profit")
 lines(sort(df$budget), fitted(model_poly[[1]])[order(df$budget)], col='red') 
 lines(sort(df$budget), fitted(model_poly[[3]])[order(df$budget)], col='green') 
 lines(sort(df$budget), fitted(model_poly[[10]])[order(df$budget)], col='blue') 
@@ -154,32 +155,44 @@ abline(model_poly[[1]], col='red')
 #TODO make a plot of the AIC
 
 
-
-
-
 #  2.b Truncated polynomial splines of degree 2 (consider k=2, 3 and 5 knots)----
-range(df$budget)
-knots1 <- c(8,300)
-knots2 <- c(8, 146, 300)
-knots3 <- c(8, 77, 146, 223, 300)
+trun_splineA = get_truncated_spline(df$profit, df$budget, n_knots=2, poly_order=2)
+trun_splineB = get_truncated_spline(df$profit, df$budget, n_knots=3, poly_order=2)
+trun_splineC = get_truncated_spline(df$profit, df$budget, n_knots=5, poly_order=2)
 
-# k = 2
-b1 <- df$budget
-b2 <- df$budget^2
-b3 <- (df$budget-knots1[1])^2*(df$budget > knots1[1])
-lm3 <- lm(profit ~ b1 + b2 + b3, data = df)
-summary(lm3)
-
-b_eval <- matrix(0,250,12)
-b_eval[,1] <- rep(1,250)
-b_eval[,2] <- age_eval
-b_eval[,3] <- age_eval^2
-b_eval[,4] <- (age_eval-knots[2])^2*(age_eval > knots[2])
-....
-b_eval[,12] <- (age_eval-knots[10])^2*(age_eval > knots[10])
-fitted3 <- round(b_eval%*%coef(lm3),5)
+pdf("./figures/T2_trunc_spline.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(df$budget, df$profit)
+lines(trun_splineA[[1]], trun_splineA[[2]], lwd=2, col="blue", lty='solid')
+lines(trun_splineB[[1]], trun_splineB[[2]], lwd=2, col="red", lty='longdash')
+lines(trun_splineC[[1]], trun_splineC[[2]], lwd=2, col="darkgreen", lty='dashed')
+legend('topright', c('2 knots', '3 knots', '5 knots'), 
+       col=c('blue', 'red', 'darkgreen'), 
+       lty=c('solid', 'longdash', 'dashed'))
+dev.off()
+#TODO talk about AIC in this context. 
+#TODO Add confidence intervals for the best model.
 
 #  2.c B-splines of degree 2 (consider m=3, 5 and 8 knots)----
+
+my_splinesA = get_bsplines(df$budget, df$profit, nrknots=3)
+my_splinesB = get_bsplines(df$budget, df$profit, nrknots=5)
+my_splinesC = get_bsplines(df$budget, df$profit, nrknots=8)
+
+pdf("./figures/T2_bspline.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(df$budget, df$profit, xlab="Profit",ylab="Budget",
+     cex.lab=1.5,cex.axis=1.3,col="black",cex=1.3)
+lines(my_splinesA[[1]],my_splinesA[[2]],lwd=2,col="blue", lty='solid')
+lines(my_splinesB[[1]],my_splinesB[[2]],lwd=2,col="red", lty='longdash')
+lines(my_splinesC[[1]],my_splinesC[[2]],lwd=2,col="darkgreen", lty='dashed')
+legend('topright', c('3 knots', '5 knots', '8 knots'), 
+       col=c('blue', 'red', 'darkgreen'), 
+       lty=c('solid', 'longdash', 'dashed'))
+dev.off()
+#TODO talk about AIC in this context. 
+#TODO Add confidence intervals for the best model.
+
 
 # B-splines
 
@@ -284,6 +297,57 @@ lines(xseq,fitted,lwd=2,col="steelblue")
 
 
 # 2.d Cubic P-splines (consider k=5, 8 and 20 knots)----
+
+output_lambda = get_lambda(df$budget, df$profit, 20)
+
+pdf("./figures/T2_GCV_pspline.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(output_lambda[['lambda']],output_lambda[['gcv']],type="l",lwd=2,
+     xlab="lambda",ylab="GCV",main="10 knots",
+     cex.lab=1.5,cex.axis=1.3,col="red",cex=1.3)
+dev.off()
+
+pdf("./figures/T2_AIC_pspline.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(output_lambda[['lambda']],output_lambda[['AIC']],type="l",lwd=2,main="",
+     xlab="lambda",ylab="AIC",
+     cex.lab=1.5,cex.axis=1.3,col="red",cex=1.3)
+dev.off()
+
+pdf("./figures/T2_BIC_pspline.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(output_lambda[['lambda']],output_lambda[['BIC']],type="l",lwd=2,main="",
+     xlab="lambda",ylab="BIC",
+     cex.lab=1.5,cex.axis=1.3,col="red",cex=1.3)
+dev.off()
+
+lambdamingcv <- output_lambda[['lambda']][which(output_lambda[['gcv']]==min(output_lambda[['gcv']]))]
+lambdaminaic <- output_lambda[['lambda']][which(output_lambda[['AIC']]==min(output_lambda[['AIC']]))]
+lambdaminbic <- output_lambda[['lambda']][which(output_lambda[['BIC']]==min(output_lambda[['BIC']]))]
+
+lambdamingcv;lambdaminaic;lambdaminbic
+
+output_psplinesA = get_cubic_psplines(df$budget, df$profit, nrknots = 5, lambdamingcv)
+output_psplinesB = get_cubic_psplines(df$budget, df$profit, nrknots = 8, lambdamingcv)
+output_psplinesC = get_cubic_psplines(df$budget, df$profit, nrknots = 20, lambdamingcv)
+
+pdf("./figures/T2_pspline.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(df$budget, df$profit, xlab="Budget", ylab="Profit", 
+     cex.lab=1.5,cex.axis=1.3,col="black",cex=1.3)
+lines(output_psplinesA[[1]], output_psplinesA[[2]], col="blue", lwd=2, lty='solid')
+lines(output_psplinesB[[1]], output_psplinesB[[2]], col="red", lwd=2, lty='longdash')
+lines(output_psplinesC[[1]], output_psplinesC[[2]], col="darkgreen", lwd=2, lty='dashed')
+legend('topright', c('5 knots', '8 knots', '20 knots'), 
+       col=c('blue', 'red', 'darkgreen'), 
+       lty=c('solid', 'longdash', 'dashed'))
+dev.off()
+
+#TODO talk about AIC in this context. 
+#TODO Add confidence intervals for the best model.
+#TODO Get AIC for psplines and bsplines
+
+
 
 x <- df$budget
 y <- df$profit
@@ -426,11 +490,13 @@ plot(x, y,xlab=" ",ylab=" ",main="20 knots, optimal lambda = 0.01",
      cex.lab=1.5,cex.axis=1.3,col="red",cex=1.3)
 lines(xseq,fitted,lwd=2,col="steelblue")
 
-# 2.d.2 Based on TP----
-# MIGHT ?
 
-# 3. Include the other covariates in the model and determine what variables show an ----
-# impact on the profit.
+# 3. Model profit ith covariates ----
+# Determine which variables show an impact on the profit.
+
+
+
+
 lm.fit <- lm(profit ~ budget + director_facebook_likes, data =df)
 summary(lm.fit)
 AIC(lm.fit)
