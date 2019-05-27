@@ -56,37 +56,6 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
                                    size = 12, hjust = 1))+
   coord_fixed()
 
-# Plots with profit----
-fit1 <- lm(profit ~ budget, data = df)
-fit2 <- lm(profit ~ budget + I(budget^2), data = df)
-fit3 <- lm(profit ~ budget + I(budget^2) + I(budget^3), data = df)
-
-# TODO The plot is not showing a line. We have to order the variable. 
-pdf("./figures/T2_profit-budgete2.pdf", width=7, height=4, pointsize=12)
-plot(df$budget, df$profit, xlab = "Budget", ylab="Profit")
-lines(df$budget, predict(fit1), col="red")
-lines(df$budget, predict(fit2), col="green")
-lines(df$budget, predict(fit3), col="blue")
-legend(230, 350, c("Degree 1", "Degree 2", "Degree 3"), lty = 1, col = c("red", "green", "blue"))
-dev.off()
-
-model_poly = list()
-model_poly[[1]] = lm(profit ~ budget, df)
-temp_formula = 'profit ~ budget'
-for (i in 2:10) {
-  temp_formula = paste(temp_formula, ' + I(budget^', i, ')', sep='')
-  model_poly[[i]] = lm(formula(temp_formula), df)
-}
-
-
-pdf("./figures/T2_profit-budgete-poly.pdf", width=7, height=4, pointsize=12)
-plot(df$budget, df$profit, xlab = "Budget", ylab="Profit")
-lines(sort(df$budget), fitted(model_poly[[1]])[order(df$budget)], col='red') 
-lines(sort(df$budget), fitted(model_poly[[3]])[order(df$budget)], col='green') 
-lines(sort(df$budget), fitted(model_poly[[10]])[order(df$budget)], col='blue') 
-legend(230, 350, c("Degree 1", "Degree 3", "Degree 10"), lty = 1, col = c("red", "green", "blue"))
-dev.off()
-
 stargazer(df)
 summary(df)
 pairs(df, panel = function(x,y) {points(x,y); lines(lowess(x,y), col = "red")})
@@ -105,10 +74,74 @@ par(mfrow = c(1,1))
 plot(df_ord$budget, df_ord$profit,ylab='Profit', xlab='Fitted values')
 lines(df_ord$budget, predict(model_loess), col='red')
 
+
+
 # TODO: 4 plot of profit vs covariates
 
-# 2. Model the profit as a function of budget only, use the following techniques:----
-# Covariates used in this analysis are content_rating, budget, director_facebook_likes.
+#  2.a Polynomial regression model----
+fit1 <- lm(profit ~ budget, data = df)
+fit2 <- lm(profit ~ budget + I(budget^2), data = df)
+fit3 <- lm(profit ~ budget + I(budget^2) + I(budget^3), data = df)
+
+
+#pdf("./figures/T2_profit-budgete2.pdf", width=7, height=4, pointsize=12)
+#plot(df$budget, df$profit, xlab = "Budget", ylab="Profit")
+#lines(df$budget, predict(fit1), col="red")
+#lines(df$budget, predict(fit2), col="green")
+#lines(df$budget, predict(fit3), col="blue")
+#legend(230, 350, c("Degree 1", "Degree 2", "Degree 3"), lty = 1, col = c("red", "green", "blue"))
+#dev.off()
+
+model_poly = list()
+model_poly[[1]] = lm(profit ~ budget, df)
+temp_formula = 'profit ~ budget'
+for (i in 2:10) {
+  temp_formula = paste(temp_formula, ' + I(budget^', i, ')', sep='')
+  model_poly[[i]] = lm(formula(temp_formula), df)
+}
+
+summary(model_poly[[1]])
+out_bic = unlist(lapply(model_poly, BIC))
+out_aic = unlist(lapply(model_poly, AIC))
+
+out_bic
+out_aic
+
+pdf("./figures/T2_AIC_polynomial.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(out_aic, type = 'l',lwd=2,main="",
+     xlab="Polynomial degree",ylab="BIC",
+     cex.lab=1.5,cex.axis=1.3,col="red",cex=1.3)
+dev.off()
+
+# Order 1 is the best model 
+par(mfrow=c(1,1))
+plot(df$budget, df$profit, ylab='Profit', xlab='Budget')
+abline(model_poly[[1]], col='red')
+
+#TODO Add confidence intervals for the best model.
+
+pdf("./figures/T2_profit-budgete-poly.pdf", width=7, height=4, pointsize=12)
+plot(df$budget, df$profit, xlab = "Budget", ylab="Profit", main='',
+     cex.lab=1.5,cex.axis=1.3,cex=1.3)
+lines(sort(df$budget), fitted(model_poly[[1]])[order(df$budget)], col='red') 
+lines(sort(df$budget), fitted(model_poly[[3]])[order(df$budget)], col='green') 
+lines(sort(df$budget), fitted(model_poly[[10]])[order(df$budget)], col='blue') 
+legend(230, 350, c("Degree 1", "Degree 3", "Degree 10"), lty = 1, col = c("red", "green", "blue"))
+dev.off()
+
+
+t.pred <- predict(model_poly[[1]], se = TRUE)
+t.upper <- t.pred$fit + qnorm(0.975) * t.pred$se.fit
+t.lower <- t.pred$fit - qnorm(0.975) * t.pred$se.fit
+
+pdf("./figures/T2_model_polynomial.pdf", width=7, height=4, pointsize=12)
+plot(df$budget, df$profit, xlab = "Budget", ylab="Profit", main='',
+     cex.lab=1.5,cex.axis=1.3,cex=1.3)
+lines(sort(df$budget), fitted(model_poly[[1]])[order(df$budget)], col='red') 
+lines(sort(df$budget), t.upper[order(df$budget)], col = 'blue', lty='longdash')
+lines(sort(df$budget), t.lower[order(df$budget)], col = 'blue', lty='longdash')
+dev.off()
 
 # Check nonlinearity (NOT NECESSARY)
 df_nonlin <- df
@@ -124,35 +157,6 @@ summary(model_discrete)
 plot(sort(df_nonlin$budget), predict(model_discrete)[order(df_nonlin$budget)], 
      type='l', ylab='Predicted profit', xlab='Budget')
 #lines(sort(df$budget), predict(model_discrete)[order(df$budget)])
-
-
-#  2.a Polynomial regression model----
-fit1 <- lm(profit ~ budget + I(budget^2), data = df)
-summary(fit1)
-plot(df$profit ~ df$budget)
-boxplot(df$profit)
-
-model_poly = list()
-model_poly[[1]] = lm(profit ~ budget, df)
-temp_formula = 'profit ~ budget'
-for (i in 2:10) {
-  temp_formula = paste(temp_formula, ' + I(budget^', i, ')', sep='')
-  model_poly[[i]] = lm(formula(temp_formula), df)
-}
-
-out_bic = unlist(lapply(model_poly, BIC))
-out_aic = unlist(lapply(model_poly, AIC))
-
-out_bic
-out_aic
-
-# Order 1 is the best model 
-par(mfrow=c(1,1))
-plot(df$budget, df$profit, ylab='Profit', xlab='Budget')
-abline(model_poly[[1]], col='red')
-#TODO talk about AIC in this context. 
-#TODO Add confidence intervals for the best model.
-#TODO make a plot of the AIC
 
 
 #  2.b Truncated polynomial splines of degree 2 (consider k=2, 3 and 5 knots)----
