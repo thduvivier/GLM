@@ -421,11 +421,30 @@ gam.check(munich.gam,col="blue")
 # 4. A movie is defined successful when the profit is positive. Fit a model that relates ----
 # the probability of success and the covariates considered above.
 
+# The model
 df$profit.bin <- ifelse(df$profit>0, 1, 0)
 fit.logit <- glm(profit.bin ~ budget + 
                  director_facebook_likes + content_rating, 
                  family=binomial("logit"), data=df)
 summary(fit.logit)
+
+# Plot
+plot(birthweight,bpd,pch="|",xlab="Birthweight (grams)",
+     cex.lab=1.5,cex.axis=1.3)
+x <- seq(min(birthweight),max(birthweight))
+lines(x,myexpit(x,b0=lrmod1$coeff[1],b1=lrmod1$coeff[2]),
+      lty=2,col="red",lwd=3)
+lines(x,mycllit(x,b0=clmod1$coeff[1],b1=clmod1$coeff[2]),
+      lty=3,col="steelblue",lwd=3)
+legend("topright",legend=c("Logistic","Comp Log Log"),lty=2:3,
+       bty="n",col=c("red","steelblue"),cex=1.5)
+
+# Also check for model fit via residual deviance
+attributes(summary(fit.logit))
+dev <- summary(fit.logit)$deviance
+df <- summary(fit.logit)$df.residual
+1-pchisq(dev,df)
+
 
 # Apply GAM
 fit.logit.gam <- gam(profit.bin ~ s(df$budget, bs="ps", k=20) + 
