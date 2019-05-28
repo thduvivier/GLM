@@ -595,6 +595,7 @@ profit.gam.full <- gam(profit ~ s(budget,bs="ps", k=10) +
 #                         content_rating, data=df)
 summary(profit.gam.full)
 
+
 profit.gam.fullA <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10)+
                           s(duration,bs="ps", k=10) + 
                           content_rating, data=df)
