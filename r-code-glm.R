@@ -352,10 +352,6 @@ legend('topright', c('5 knots', '8 knots', '20 knots'),
        lty=c('solid', 'longdash', 'dashed'))
 dev.off()
 
-#TODO talk about AIC in this context. 
-#TODO Add confidence intervals for the best model.
-#TODO Get AIC for psplines and bsplines
-
 
 
 x <- df$budget
@@ -549,8 +545,20 @@ profit.gam <- gam(profit ~ s(budget,bs="ps", k=10) + s(director_facebook_likes, 
 summary(profit.gam)
 gam.check(profit.gam)
 
-#par(mfrow = c(1,1))
-#plot(profit.gam,residuals=FALSE,col="red",shade=TRUE, cex = 2)
+pdf("./figures/T2_gam_residual_plot.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(profit.gam$linear.predictors, profit.gam$residuals, 
+     lwd=2, cex.lab=1.5,cex.axis=1.3,cex=1.3,
+     ylab = 'Deviance residuals', xlab = 'Linear predictors')
+lines(sort(profit.gam$linear.predictors), 
+      fitted(loess(profit.gam$residuals ~ profit.gam$linear.predictors))[order(profit.gam$linear.predictors)],
+      lwd=2, col='red')
+dev.off()
+
+pdf("./figures/T2_gam_qqplot.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+qq.gam(profit.gam, lwd=2, cex.lab=1.5,cex.axis=1.3,cex=1.3)
+dev.off()
 
 pdf("./figures/T2_gam_resid_budget.pdf", width=7, height=4, pointsize=12)
 par(mfrow = c(1,1))
@@ -575,10 +583,17 @@ dev.off()
 #AIC(profit.gamA, profit.gamB, profit.gamC, profit.gamD, profit.gam.full)
 
 # Step AIC procedure
+df['logfb'] = log(df$director_facebook_likes+1)
+
 profit.gam.full <- gam(profit ~ s(budget,bs="ps", k=10) + 
                          s(director_facebook_likes, bs="ps", k=10) +
                          s(duration,bs="ps", k=10) + 
                          content_rating, data=df)
+#profit.gam.full <- gam(profit ~ s(budget,bs="ps", k=10) + 
+#                         s(logfb, bs="ps", k=10) +
+#                         s(duration,bs="ps", k=10) + 
+#                         content_rating, data=df)
+summary(profit.gam.full)
 
 profit.gam.fullA <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10)+
                           s(duration,bs="ps", k=10) + 
@@ -615,14 +630,32 @@ AIC(profit.gam.full, profit.gam.fullD, profit.gam.fullDC, profit.gam.fullDCA, pr
 
 summary(profit.gam.fullDC)
 gam.check(profit.gam.fullDC)
+
+pdf("./figures/T2_finalGAM_residual_plot.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+plot(profit.gam.fullDC$linear.predictors, profit.gam.fullDC$residuals, 
+     lwd=2, cex.lab=1.5,cex.axis=1.3,cex=1.3,
+     ylab = 'Deviance residuals', xlab = 'Linear predictors')
+lines(sort(profit.gam.fullDC$linear.predictors), 
+      fitted(loess(profit.gam.fullDC$residuals ~ profit.gam.fullDC$linear.predictors))[order(profit.gam.fullDC$linear.predictors)],
+      lwd=2, col='red')
+dev.off()
+
+pdf("./figures/T2_finalGAM_qqplot.pdf", width=7, height=4, pointsize=12)
+par(mfrow=c(1,1))
+qq.gam(profit.gam.fullDC, lwd=2, cex.lab=1.5,cex.axis=1.3,cex=1.3)
+dev.off()
+
 pdf("./figures/T2_finalGAM_resid_budget.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
-plot(profit.gam.fullDC,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 1)
+plot(profit.gam.fullDC,residuals=TRUE,col="red",shade=TRUE, select = 1,
+     cex.lab=1.5,cex.axis=1.3,cex=1.3)
 dev.off()
 
 pdf("./figures/T2_finalGAM_resid_fblikes.pdf", width=7, height=4, pointsize=12)
 par(mfrow=c(1,1))
-plot(profit.gam.fullDC,residuals=TRUE,col="red",shade=TRUE, cex = 2, select = 2)
+plot(profit.gam.fullDC,residuals=TRUE,col="red",shade=TRUE, select = 2,
+     cex.lab=1.5,cex.axis=1.3,cex=1.3)
 dev.off()
 
 hat.gam.full = influence.gam(profit.gam.full)
@@ -637,7 +670,9 @@ which(hat.gam.fullDC == max(hat.gam.fullDC))
 
 pdf("./figures/T2_finalGAM_hatmatrix.pdf", width=7, height=4, pointsize=12)
 par(mfrow = c(1,1))
-plot(hat.gam.fullDC, type='l')
+plot(hat.gam.fullDC, type='l', lwd=2, main="",
+     xlab="Index",ylab="Influence",
+     cex.lab=1.5,cex.axis=1.3,cex=1.3)
 dev.off()
 # Same outlier as in the full model
 
@@ -649,7 +684,7 @@ profit.gam.full.outlier <- gam(profit ~ s(budget,bs="ps", k=10) +
                                  s(duration,bs="ps", k=10) + 
                                  content_rating, data=df_outlier)
 summary(profit.gam.full)
-plot(profit.gam.full.outlier,residuals=TRUE,col="red",shade=TRUE, cex = 2)
+#plot(profit.gam.full.outlier,residuals=TRUE,col="red",shade=TRUE, cex = 2)
 
 profit.gam.fullA.outlier <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10) +
                                 s(duration,bs="ps", k=10) + 
@@ -670,38 +705,33 @@ AIC(profit.gam.full.outlier, profit.gam.fullA.outlier,
 # We prefer model D
 
 profit.gam.fullDA.outlier <- gam(profit ~ s(director_facebook_likes, bs="ps", k=10) +
-                                 s(duration,bs="ps", k=10), data=df)
+                                 s(duration,bs="ps", k=10), data=df_outlier)
 profit.gam.fullDB.outlier <- gam(profit ~ s(budget,bs="ps", k=10) +
-                                 s(duration,bs="ps", k=10), data=df)
+                                 s(duration,bs="ps", k=10), data=df_outlier)
 profit.gam.fullDC.outlier <- gam(profit ~ s(budget,bs="ps", k=10) + 
                                  s(director_facebook_likes, bs="ps", k=10), 
-                                 data=df)
+                                 data=df_outlier)
 
 AIC(profit.gam.full.outlier, profit.gam.fullD.outlier, 
     profit.gam.fullDA.outlier, profit.gam.fullDB.outlier, 
     profit.gam.fullDC.outlier)
-# We prefer model D
+# We prefer model DC
 
-summary(profit.gam.fullD.outlier)
-gam.check(profit.gam.fullD.outlier)
+summary(profit.gam.fullDC.outlier)
+gam.check(profit.gam.fullDC.outlier)
 
 pdf("./figures/T2_finalGAM_outlier_resid_budget.pdf", width=7, height=4, pointsize=12)
 par(mfrow= c(1,1))
-plot(profit.gam.fullD.outlier,residuals=TRUE,col="red",
+plot(profit.gam.fullDC.outlier,residuals=TRUE,col="red",
      shade=TRUE, cex = 2, select = 1)
 dev.off()
 
 pdf("./figures/T2_finalGAM_outlier_resid_fblikes.pdf", width=7, height=4, pointsize=12)
 par(mfrow= c(1,1))
-plot(profit.gam.fullD.outlier,residuals=TRUE,col="red",
+plot(profit.gam.fullDC.outlier,residuals=TRUE,col="red",
      shade=TRUE, cex = 2, select = 2)
 dev.off()
 
-pdf("./figures/T2_finalGAM_outlier_resid_duration.pdf", width=7, height=4, pointsize=12)
-par(mfrow= c(1,1))
-plot(profit.gam.fullD.outlier,residuals=TRUE,col="red",
-     shade=TRUE, cex = 2, select = 3)
-dev.off()
 
 hat.gam.fullD.outlier = influence.gam(profit.gam.fullD.outlier)
 summary(hat.gam.fullD.outlier)
