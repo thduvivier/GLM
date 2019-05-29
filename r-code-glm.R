@@ -15,6 +15,15 @@ df$profit.bin <- ifelse(df$profit>0, 1, 0)
 
 # 1. Descriptive ----
 
+sapply(df, mean, na.rm=TRUE)
+sapply(df, sd, na.rm=TRUE)
+
+# Tables
+ag <- aggregate(profit ~ content_rating, df, function(x) c(mean = mean(x), sd = sd(x)))
+
+
+
+
 df <- df[,-4]
 # 1.a Correlation Heatmap
 cormat <- round(cor(df, method = "pearson", use = "complete.obs"), 2)
@@ -428,10 +437,10 @@ ggplot(df, aes(budget, profit) ) +
   stat_smooth()
 ggplot(df, aes(duration, profit) ) +
   geom_point() +
-  stat_smooth()
+  stat_smooth(method="loess")
 ggplot(df, aes(director_facebook_likes, profit) ) +
   geom_point() +
-  stat_smooth()
+  stat_smooth(method="loess")
 ggplot(df, aes(content_rating, y=profit) ) +
   geom_point() +
   stat_summary(fun.y=mean, geom="point", shape=20, size=4, color="red", fill="red")
@@ -453,13 +462,26 @@ log.fit.1 <- glm(I(profit>0) ~ budget +
                  content_rating, 
                  family = binomial,
                  data = df)
+summary(log.fit.1)
+
+log.fit.2 <- glm(I(profit>0) ~ budget*duration, 
+                 family = binomial,
+                 data = df)
 summary(log.fit.2)
 
+log.fit.3 <- glm(I(profit>0) ~ duration*budget + director_facebook_likes, 
+                 family = binomial,
+                 data = df)
+summary(log.fit.3)
 
-# option Chisq is the same here as LRT
-anova(log.fit.2,test="Chisq")
-anova(carieslogitmodel2,test="LRT")
-drop1(carieslogitmodel2,test="Chisq")
+
+
+# Check for model fit via residual deviance
+attributes(summary(log.fit.1))
+dev <- summary(log.fit.1)$deviance
+df <- summary(log.fit.1)$df.residual
+1-pchisq(dev,df)
+
 
 # Apply GAM
 logitgam1 <- gam(I(profit > 0) ~ 
@@ -504,23 +526,9 @@ logitgam8 <- gam(I(profit > 0) ~
                  duration,
                  data=df, family = binomial)
 
+# Compare models
 AIC(log.fit.1, logitgam1, logitgam2, logitgam3, logitgam4, logitgam5, logitgam6, 
         logitgam7, logitgam8)
 
-# Plot
-plot(df$budget,df$profit.bin,pch="|",
-     cex.lab=1.5,cex.axis=1.3)
-x <- seq(min(birthweight),max(birthweight))
-lines(x,myexpit(x,b0=lrmod1$coeff[1],b1=lrmod1$coeff[2]),
-      lty=2,col="red",lwd=3)
-lines(x,mycllit(x,b0=clmod1$coeff[1],b1=clmod1$coeff[2]),
-      lty=3,col="steelblue",lwd=3)
-legend("topright",legend=c("Logistic","Comp Log Log"),lty=2:3,
-       bty="n",col=c("red","steelblue"),cex=1.5)
-
-# Also check for model fit via residual deviance
-attributes(summary(fit.logit))
-dev <- summary(fit.logit)$deviance
-df <- summary(fit.logit)$df.residual
-1-pchisq(dev,df)
+summary(logitgam4)
 
