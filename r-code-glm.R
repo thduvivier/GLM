@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Authors: Bruno Esposito and Thomas Duvivier
 rm(list = ls())
 
@@ -821,20 +822,18 @@ plot(df.gam, residuals=FALSE, cex=1.3, col="red", shade=TRUE)
 gam.check(munich.gam,col="blue")
 
 
-# 4. Model profit as a binomial ----
-# A movie is defined successful when the profit is positive. 
-# Fit a model that relates the probability of success and 
-#   the covariates considered above.
+# 4. A movie is defined successful when the profit is positive. Fit a model that relates ----
+# the probability of success and the covariates considered above.
 
 ggplot(df, aes(budget, profit) ) +
   geom_point() +
   stat_smooth()
 ggplot(df, aes(duration, profit) ) +
   geom_point() +
-  stat_smooth()
+  stat_smooth(method="loess")
 ggplot(df, aes(director_facebook_likes, profit) ) +
   geom_point() +
-  stat_smooth()
+  stat_smooth(method="loess")
 ggplot(df, aes(content_rating, y=profit) ) +
   geom_point() +
   stat_summary(fun.y=mean, geom="point", shape=20, size=4, color="red", fill="red")
@@ -842,73 +841,199 @@ ggplot(df, aes(content_rating, y=profit) ) +
 
 
 # The model
+
+# From the full model
+
+log.fit.full <- glm(I(profit>0) ~ 
+                      budget + 
+                      duration + 
+                      director_facebook_likes +
+                      content_rating, 
+                    family = binomial("logit"),
+                    data = df)
+summary(log.fit.full)
+
+log.fit.red.1 <- glm(I(profit>0) ~ 
+                       budget + 
+                       
+                       director_facebook_likes +
+                       content_rating, 
+                     family = binomial("logit"),
+                     data = df)
+summary(log.fit.red.1)
+
+log.fit.red.2 <- glm(I(profit>0) ~ 
+                       
+                       
+                       director_facebook_likes +
+                       content_rating, 
+                     family = binomial("logit"),
+                     data = df)
+summary(log.fit.red.2)
+
+log.fit.red.3 <- glm(I(profit>0) ~ 
+                       
+                       
+                       
+                       content_rating, 
+                     family = binomial("logit"),
+                     data = df)
+summary(log.fit.red.3)
+
+# Linear no interaction
+
 # First we start with simple model, then increase by one variable at a time
 # Two different tests are in use: LRT or score test (Rao)
-logit.fit <- glm(I(profit>0) ~ budget, data = df, family = binomial) 
-summary(logit.fit)
-add1(logit.fit,~ . + director_facebook_likes + content_rating + duration, test="LRT")
 
-# Then we start with fully specified model 
-# Add or delete variables one by one
-log.fit.1 <- glm(I(profit>0) ~ budget + 
-                 duration +
-                 director_facebook_likes + 
-                 content_rating, 
-                 family = binomial,
+# start with budget
+logit.fit1 <- glm(I(profit>0) ~ budget, data = df, family = binomial("logit")) 
+summary(logit.fit1)
+add1(logit.fit1,~ . + director_facebook_likes + content_rating + duration, test="LRT")
+
+# start with duration
+logit.fit2 <- glm(I(profit>0) ~ duration, data = df, family = binomial("logit")) 
+summary(logit.fit2)
+add1(logit.fit2,~ . + director_facebook_likes + content_rating + budget, test="LRT")
+
+# start with director_facebook_likes
+logit.fit3 <- glm(I(profit>0) ~ director_facebook_likes, data = df, family = binomial("logit")) 
+summary(logit.fit3)
+add1(logit.fit3,~ . + budget + content_rating + duration, test="LRT")
+
+# start with content_rating
+logit.fit4 <- glm(I(profit>0) ~ content_rating, data = df, family = binomial("logit")) 
+summary(logit.fit4)
+add1(logit.fit4,~ . + director_facebook_likes + budget + duration, test="LRT")
+
+AIC(logit.fit1, logit.fit2, logit.fit3, logit.fit4)
+
+###
+# Quadratic No interactions
+###
+
+log.fit.quad.1 <- glm(I(profit>0) ~ 
+                        budget + I(budget^2) + I(budget^3) + 
+                        duration + I(duration^2) + I(duration^3) + 
+                        director_facebook_likes + I(director_facebook_likes^2) + I(director_facebook_likes^3)+
+                        content_rating, 
+                      family = binomial("logit"),
+                      data = df)
+summary(log.fit.quad.1)
+
+log.fit.quad.2 <- glm(I(profit>0) ~ 
+                        budget + I(budget^2), 
+                      family = binomial("logit"),
+                      data = df)
+summary(log.fit.quad.2)
+log.fit.quad.3 <- glm(I(profit>0) ~ 
+                        duration + I(duration^2), 
+                      family = binomial("logit"),
+                      data = df)
+summary(log.fit.quad.3)
+log.fit.quad.4 <- glm(I(profit>0) ~
+                        director_facebook_likes + I(director_facebook_likes^2) + I(director_facebook_likes^3)
+                      , 
+                      family = binomial("logit"),
+                      data = df)
+summary(log.fit.quad.4)
+
+AIC(log.fit.quad.1, log.fit.quad.2, log.fit.quad.3, log.fit.quad.4)
+summary(log.fit.quad.2)
+
+###
+# Interactions
+###
+
+log.fit.1 <- glm(I(profit>0) ~ director_facebook_likes + duration + budget*director_facebook_likes , 
+                 family = binomial("logit"),
+                 data = df)
+summary(log.fit.1)
+
+log.fit.2 <- glm(I(profit>0) ~ budget + duration + budget*duration, 
+                 family = binomial("logit"),
                  data = df)
 summary(log.fit.2)
 
+log.fit.4 <- glm(I(profit>0) ~ budget + content_rating + budget*content_rating, 
+                 family = binomial("logit"),
+                 data = df)
+summary(log.fit.4)
 
-# option Chisq is the same here as LRT
-anova(log.fit.2,test="Chisq")
-anova(carieslogitmodel2,test="LRT")
-drop1(carieslogitmodel2,test="Chisq")
+log.fit.5 <- glm(I(profit>0) ~ duration + content_rating + duration*content_rating, 
+                 family = binomial("logit"),
+                 data = df)
+summary(log.fit.5)
+
+log.fit.6 <- glm(I(profit>0) ~ budget + content_rating + budget*content_rating, 
+                 family = binomial("logit"),
+                 data = df)
+summary(log.fit.6)
+
+log.fit.7 <- glm(I(profit>0) ~ director_facebook_likes + content_rating + director_facebook_likes*content_rating, 
+                 family = binomial("logit"),
+                 data = df)
+summary(log.fit.7)
+
+
+AIC(log.fit.1, log.fit.2, log.fit.4, log.fit.5, log.fit.6, log.fit.7)
+
 
 # Apply GAM
 logitgam1 <- gam(I(profit > 0) ~ 
-                 s(budget, bs="ps", k=30) + 
-                 duration +
-                 director_facebook_likes + 
-                 content_rating, 
-                 data=df, family = binomial)
+                   s(budget, bs="ps", k=30) + 
+                   duration +
+                   director_facebook_likes + 
+                   content_rating, 
+                 data=df, family = binomial("logit"))
+summary(logitgam1)
 
 logitgam2 <- gam(I(profit > 0) ~ 
-                 budget + 
-                 s(duration, bs="ps", k=30) +
-                 director_facebook_likes + 
-                 content_rating, 
-                 data=df, family = binomial)
+                   budget + 
+                   s(duration, bs="ps", k=30) +
+                   director_facebook_likes + 
+                   content_rating, 
+                 data=df, family = binomial("logit"))
+summary(logitgam2)
 
 logitgam3 <- gam(I(profit > 0) ~ 
-                 s(budget, bs="ps", k=30) + 
-                 s(duration, bs="ps", k=30) +
-                 director_facebook_likes + 
-                 content_rating, 
-                 data=df, family = binomial)
+                   s(budget, bs="ps", k=30) + 
+                   s(duration, bs="ps", k=30) +
+                   director_facebook_likes + 
+                   content_rating, 
+                 data=df, family = binomial("logit"))
+summary(logitgam3)
 
 logitgam4 <- gam(I(profit > 0) ~ 
-                 s(budget, bs="ps", k=30),
-                 data=df, family = binomial)
+                   s(budget, bs="ps", k=30),
+                 data=df, family = binomial("logit"))
+summary(logitgam4)
 
 logitgam5 <- gam(I(profit > 0) ~ 
-                 budget,
-                 data=df, family = binomial)
+                   budget,
+                 data=df, family = binomial("logit"))
+summary(logitgam5)
 
 logitgam6 <- gam(I(profit > 0) ~ 
-                 s(duration, bs="ps", k=30),
-                 data=df, family = binomial)
+                   s(duration, bs="ps", k=30),
+                 data=df, family = binomial("logit"))
+summary(logitgam6)
 
 logitgam7 <- gam(I(profit > 0) ~ 
-                 duration,
-                 data=df, family = binomial)
+                   duration,
+                 data=df, family = binomial("logit"))
+summary(logitgam7)
 
 logitgam8 <- gam(I(profit > 0) ~ 
-                 s(budget, bs="ps", k=30) +
-                 duration,
-                 data=df, family = binomial)
+                   s(budget, bs="ps", k=30) +
+                   duration,
+                 data=df, family = binomial("logit"))
+summary(logitgam8)
 
+# Compare models
 AIC(log.fit.1, logitgam1, logitgam2, logitgam3, logitgam4, logitgam5, logitgam6, 
-        logitgam7, logitgam8)
+    logitgam7, logitgam8)
+
+summary(logitgam4)
 
 # Plot
 plot(df$budget,df$profit.bin,pch="|",
