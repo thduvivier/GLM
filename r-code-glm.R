@@ -9,6 +9,9 @@ library(reshape2)
 library(MASS)
 library(splines)
 library(mgcv)
+library(pROC)
+library(caret)
+library(MASS)
 
 source("./glm_functions.r")
 
@@ -17,8 +20,10 @@ thomas.path <- paste0("C:/Users/duviv/Documents/University/KUL/S2/",
 bruno.path <- paste0("/Users/bruno_esposito/Dropbox/KUL/Courses/",
                       "2nd Semester/Generalized Linear Models/",
                       "Assignment2/GLM")
+bruno.path2 <- paste0('D:/Dropbox/KUL/Courses/2nd Semester/',
+                      'Generalized Linear Models/Assignment2/GLM/')
 
-setwd(bruno.path)
+setwd(bruno.path2)
 raw_df <- read.xlsx("./data/IMDb.xlsx")
 df <- raw_df[,c("profit", "budget", "director_facebook_likes", "content_rating", "duration")]
 df$content_rating <- as.factor(df$content_rating)
@@ -922,3 +927,310 @@ dev <- summary(fit.logit)$deviance
 df <- summary(fit.logit)$df.residual
 1-pchisq(dev,df)
 
+#############################
+get_models_logit <- function(y_string, x_formula, dataset, link_funct) {
+  output = list()
+  null_model = glm(formula(paste(y_string, "~ 1")), family=binomial(link=link_funct),
+                   data = dataset)
+  n = dim(dataset)[1]
+  output[['Full']] <- glm(formula(paste(y_string, "~", x_formula)), 
+                          family=binomial(link=link_funct), data=dataset)
+  print('---------------- AIC FULL ----------------')
+  output[['AIC_Full']] <- stepAIC(output[['Full']], 
+                                  scope = list(
+                                    upper = formula(paste('~ ', x_formula)), 
+                                    lower = ~ 1),
+                                  direction = 'both')
+  print('---------------- AIC NULL ----------------')
+  output[['AIC_Null']] <- stepAIC(null_model, 
+                                  scope = list(
+                                    upper = formula(paste('~ ', x_formula)), 
+                                    lower = ~ 1),
+                                  direction = 'both')
+  print('---------------- BIC FULL ----------------')
+  output[['BIC_Full']]<- stepAIC(output[['Full']], 
+                                 scope = list(
+                                   upper = formula(paste('~ ', x_formula)), 
+                                   lower = ~ 1),
+                                 direction = 'both', k = log(n))
+  print('---------------- BIC NULL ----------------')
+  output[['BIC_Null']] <- stepAIC(null_model, 
+                                  scope = list(
+                                    upper = formula(paste('~ ', x_formula)), 
+                                    lower = ~ 1),
+                                  direction = 'both', k = log(n))
+  return(output)
+}
+
+quality_report_general <- function(models, true_y) {
+  deviance_vec = lapply(models, deviance)
+  aic_vec = lapply(models, AIC)
+  bic_vec = lapply(models, BIC)
+  nagel_vec = lapply(models, get_Nagel_R2)
+  log_score_vec = lapply(models, get_log_score, true_y)
+  output = data.frame(rbind(deviance_vec, aic_vec, bic_vec, log_score_vec, nagel_vec), 
+                      row.names = c('Deviance', 'AIC', 'BIC', 'Log_score', 'Nagel_R2'))
+  names(output) = names(models)
+  return(output)
+}
+
+get_log_score <- function(model, true_y) {
+  return(scoring(true_y, fitted(model))[[1]])
+}
+
+get_Nagel_R2 <- function(model) {
+  return(NagelkerkeR2(model)$R2)
+}
+
+get_hosmer <- function(model, true_y,g=10) {
+  return(hosmerlem(true_y, model$fitted.values, g=g)$p.value)
+}
+
+get_auc <- function(model, true_y) {
+  return(auc(true_y, model$fitted.values))
+}
+
+get_cv_auc <- function(model, link_funct) {
+  set.seed(0731858)
+  cv = 5
+  temp_data = as.data.frame(model.matrix(model)[, -1]) 
+  temp_data_names = colnames(model.matrix(model))[-1]
+  colnames(temp_data) = temp_data_names
+  output_vec = c()
+  test_folds = createFolds(temp_data[, 1], k = cv)
+  y_name = names(model$model)[1]
+  y_df = data.frame(y_name = model$model[1])
+  temp_data = cbind(y_df, temp_data)
+  for (i in 1:cv) {
+    temp_test = temp_data[test_folds[[i]], ]
+    temp_train = temp_data[-test_folds[[i]], ]
+    fit = glm(formula(paste(y_name, '~ .')), family=binomial(link=link_funct), 
+              data = temp_train)
+    new_y = temp_test[, 1]
+    new_x = as.data.frame(temp_test[, -1])
+    colnames(new_x) = temp_data_names
+    auc_output = auc(new_y, predict(fit, new_x, type='response'))
+    output_vec = c(output_vec, auc_output)
+  }
+  output = mean(output_vec)
+  return(output)
+}
+
+quality_report <- function(models, true_y, link_funct) {
+  deviance_vec = lapply(models, deviance)
+  aic_vec = lapply(models, AIC)
+  bic_vec = lapply(models, BIC)
+  auc_vec = lapply(models, get_auc, true_y)
+  auc_cv_vec = lapply(models, get_cv_auc, link_funct)
+  hosmer_vec = lapply(models, get_hosmer, true_y)
+  nagel_vec = lapply(models, get_Nagel_R2)
+  output = data.frame(rbind(deviance_vec, aic_vec, bic_vec, auc_vec, 
+                            auc_cv_vec, hosmer_vec, nagel_vec), 
+                      row.names = c('Deviance', 'AIC', 'BIC', 'AUC', 
+                                    'AUC_CV', 'Hosmer_Pval', 'Nagel_R2'))
+  names(output) = names(models)
+  return(output)
+}
+
+hosmerlem = function(y, yhat, g=10) {
+  fcutyhat = cut(yhat, breaks = quantile(yhat, probs=seq(0,1, 1/g)), 
+                 include.lowest=TRUE)
+  obs = xtabs(cbind(1 - y, y) ~ fcutyhat)
+  expect = xtabs(cbind(1 - yhat, yhat) ~ fcutyhat)
+  chisq = sum((obs - expect)^2/expect)
+  P = 1 - pchisq(chisq, g - 2)
+  return(list(chisq=chisq,p.value=P))
+}
+
+OptimisedConc=function(model) {
+  Data = cbind(model$y, model$fitted.values) 
+  ones = Data[Data[,1] == 1,]
+  zeros = Data[Data[,1] == 0,]
+  conc=matrix(0, dim(zeros)[1], dim(ones)[1])
+  disc=matrix(0, dim(zeros)[1], dim(ones)[1])
+  ties=matrix(0, dim(zeros)[1], dim(ones)[1])
+  for (j in 1:dim(zeros)[1])
+  {
+    for (i in 1:dim(ones)[1])
+    {
+      if (ones[i,2]>zeros[j,2])
+      {conc[j,i]=1}
+      else if (ones[i,2]<zeros[j,2])
+      {disc[j,i]=1}
+      else if (ones[i,2]==zeros[j,2])
+      {ties[j,i]=1}
+    }
+  }
+  Pairs=dim(zeros)[1]*dim(ones)[1]
+  PercentConcordance=(sum(conc)/Pairs)*100
+  PercentDiscordance=(sum(disc)/Pairs)*100
+  PercentTied=(sum(ties)/Pairs)*100
+  return(list("Percent Concordance"=PercentConcordance,"Percent Discordance"=PercentDiscordance,"Percent Tied"=PercentTied,"Pairs"=Pairs))
+}
+
+graph_binomial_fit <- function(model, true_y, pointwise=FALSE, ci=TRUE) {
+  score_x = model$linear.predictors
+  phat = model$fitted.values
+  support = as.data.frame(model$model[,-1])
+  colnames(support) = colnames(model$model[-1])
+  conf_intervals = get_conf_interval(model, support, pointwise = pointwise)
+  model_results = data.frame(score_x, phat)
+  model_results = model_results[order(model_results$score_x),] 
+  
+  par(mfrow=c(1,1))
+  plot(model_results[, c('score_x', 'phat')], xlab="Score", ylab="Response",type="n", 
+       xlim=c(min(score_x), max(score_x)), ylim=c(0,1),
+       cex.lab=1.5, cex.axis=1.3)
+  points(score_x, true_y, col="black", pch=16)
+  lines(model_results[, c('score_x', 'phat')], col="red", lwd=3)
+  if (ci==TRUE) {
+    lines(conf_intervals[,c('score', 'lower')], lty = 2, col='red')
+    lines(conf_intervals[,c('score', 'upper')], lty = 2, col='red') 
+  }
+}
+
+get_conf_interval <- function(model, support, conf_level=0.95, pointwise=FALSE) {
+  alpha <- (1-conf_level) / 2
+  crit <- qnorm(alpha, lower.tail=F)
+  
+  # These are the same as model$linear.predictors
+  pred.object <- predict(model, support, type="link", se.fit=T)
+  
+  if (pointwise==TRUE) {
+    low <- pred.object$fit - crit * pred.object$se.fit
+    upp <- pred.object$fit + crit * pred.object$se.fit 
+    lower <- family(model)$linkinv(low)
+    upper <- family(model)$linkinv(upp)
+    ci <- data.frame(score=model$linear.predictors, lower=lower, upper=upper)
+    ci <- ci[order(ci$score), ]
+    row.names(ci) <- row.names(support)
+  }
+  else {
+    model_results = data.frame(fit = pred.object$fit, se.fit = pred.object$se.fit)
+    model_results = model_results[order(model_results$fit), ]
+    chosen_vals = quantile(model_results$fit, probs = seq(0,1,0.2))
+    
+    model_results = model_results[which(model_results$fit %in% chosen_vals), ]
+    model_results = model_results[!duplicated(model_results$fit), ]
+    
+    low <- model_results$fit - crit * model_results$se.fit
+    upp <- model_results$fit + crit * model_results$se.fit
+    lower <- family(model)$linkinv(low)
+    upper <- family(model)$linkinv(upp)
+    ci <- cbind(score=model_results$fit, lower=lower, upper=upper)
+    row.names(ci) <- row.names(model_results)
+  }
+  return(ci)
+}
+
+graph_multiple_binomial_fit_real <- function(models, true_y, labels) {
+  tot_score_x = c()
+  score_x = models[[1]]$linear.predictors
+  phat = models[[1]]$fitted.values
+  model_results = data.frame(score_x, phat)
+  model_results = model_results[order(model_results$score_x),] 
+  
+  for (model in models){
+    tot_score_x = c(tot_score_x, model$linear.predictors)
+  }
+  
+  par(mfrow=c(1,1))
+  plot(score_x, true_y, xlab="Score", ylab="Response", pch="|",
+       xlim=c(min(tot_score_x), max(tot_score_x)), ylim=c(0,1),
+       cex.lab=1.5, cex.axis=1.3)
+  
+  i = 0
+  for (model in models) {
+    i= i +1
+    score_x = model$linear.predictors
+    phat = model$fitted.values
+    model_results = data.frame(score_x, phat)
+    model_results = model_results[order(model_results$score_x),] 
+    lines(model_results, col=i, lwd=2, lty=2)
+  }
+}
+
+
+interact_formula = paste0('(budget + director_facebook_likes + factor(content_rating) + duration)^2',
+                          ' + I(budget^2) + I(director_facebook_likes^2) + I(duration^2)')
+interact_models_logit = get_models_logit('profit.bin', interact_formula, df, 'logit')
+lapply(interact_models_logit, summary)
+
+quality_report(interact_models_logit[c(1,2,3)], df$profit.bin, 'logit')
+
+interact_models_logit = get_models_logit('profit.bin', interact_formula, df, 'probit')
+lapply(interact_models_logit, summary)
+
+quality_report(interact_models_logit[c(1,2,3)], df$profit.bin, 'probit')
+
+interact_models_logit = get_models_logit('profit.bin', interact_formula, df, 'cloglog')
+lapply(interact_models_logit, summary)
+
+quality_report(interact_models_logit[c(1,2)], df$profit.bin, 'cloglog')
+
+top_model = interact_models_logit[['AIC_Null']]
+summary(top_model)
+
+OptimisedConc(top_model)
+
+get_auc(top_model, df$profit.bin)
+get_cv_auc(top_model, 'logit')
+
+plot(top_model, which=4)
+
+naive_model = glm(profit.bin ~ budget + director_facebook_likes + factor(content_rating) + 
+                    duration, data = df, family = binomial)
+summary(naive_model)
+
+pdf("./figures/T2_logit_prediction.pdf", width=7, height=4, pointsize=12)
+par(mfrow = c(1,1))
+graph_binomial_fit(top_model, df$profit.bin, pointwise=TRUE, ci=TRUE)
+dev.off()
+
+naive_gam = gam(profit.bin ~ s(budget, bs="ps", k=20) + s(duration, bs="ps", k=20) +
+                s(director_facebook_likes, bs="ps", k=20) + content_rating, 
+              data = df, family = binomial)
+gamA = gam(profit.bin ~ s(budget, bs="ps", k=20) + s(duration, bs="ps", k=20) +
+                  s(director_facebook_likes, bs="ps", k=20), 
+                data = df, family = binomial)
+gamB = gam(profit.bin ~ s(budget, bs="ps", k=20) + s(duration, bs="ps", k=20) +
+                  content_rating, 
+                data = df, family = binomial)
+gamC = gam(profit.bin ~ s(budget, bs="ps", k=20) +
+                  s(director_facebook_likes, bs="ps", k=20) + content_rating, 
+                data = df, family = binomial)
+gamD = gam(profit.bin ~ s(duration, bs="ps", k=20) +
+                  s(director_facebook_likes, bs="ps", k=20) + content_rating, 
+                data = df, family = binomial)
+AIC(naive_gam, gamA, gamB, gamC, gamD)
+
+gamAA = gam(profit.bin ~ s(budget, bs="ps", k=20) + s(duration, bs="ps", k=20), 
+           data = df, family = binomial)
+
+gamAB = gam(profit.bin ~ s(budget, bs="ps", k=20) + s(director_facebook_likes, bs="ps", k=20), 
+            data = df, family = binomial)
+
+gamAC = gam(profit.bin ~ s(duration, bs="ps", k=20) + s(director_facebook_likes, bs="ps", k=20), 
+            data = df, family = binomial)
+
+AIC(naive_gam, gamA, gamAA, gamAB, gamAC)
+
+gamAAA = gam(profit.bin ~ s(budget, bs="ps", k=20), 
+            data = df, family = binomial)
+gamAAB = gam(profit.bin ~ s(duration, bs="ps", k=20), 
+            data = df, family = binomial)
+
+AIC(naive_gam, gamA, gamAA, gamAAA, gamAAB)
+
+gamAAAA = gam(profit.bin ~ 1, 
+             data = df, family = binomial)
+
+AIC(naive_gam, gamA, gamAA, gamAAA, gamAAAA)
+
+top_gam = gamAAA
+
+pdf("./figures/T2_binomial_gam_resid.pdf", width=7, height=4, pointsize=12)
+par(mfrow= c(1,1))
+plot(top_gam,residuals=TRUE,col="red",
+     shade=TRUE, cex = 2, select = 1)
+dev.off()
